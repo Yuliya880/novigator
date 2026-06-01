@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Навигатор • Серебряные ели</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet Routing Machine CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --sage-50: #f4f7f4;
+      --sage-100: #e2e8e0;
+      --sage-200: #c5d1c0;
+      --sage-300: #a3b89c;
+      --sage-400: #7d9b74;
+      --sage-500: #5f7d55;
+      --sage-600: #4a6342;
+      --sage-700: #3b4f35;
+      --sage-800: #2d3c28;
+      --sage-900: #1f2b1c;
+      --sage-950: #151e13;
+
+      --surface: #1e2a1b;
+      --surface-light: #253322;
+      --surface-card: #2a3a26;
+      --border: #374f30;
+      --text-primary: #e3ebe0;
+      --text-secondary: #b0c2a8;
+      --accent: #7d9b74;
+      --accent-soft: #5f7d55;
+      --warning: #d4a373;
+      --warning-soft: #bc8a5f;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', sans-serif;
+      background: linear-gradient(160deg, #151e13 0%, #1c2819 40%, #1e2a1b 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: clamp(8px, 2vw, 20px);
+      margin: 0;
+    }
+
+    .app-wrapper {
+      width: 100%;
+      max-width: 500px;
+      background: var(--surface);
+      border-radius: clamp(24px, 4vw, 40px);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: clamp(600px, 90vh, 850px);
+      transition: all 0.2s ease;
+    }
+
+    /* статус-бар */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: clamp(10px, 2vw, 16px) clamp(16px, 3vw, 24px);
+      color: var(--text-secondary);
+      font-size: clamp(12px, 2.5vw, 15px);
+      font-weight: 500;
+      background: transparent;
+      letter-spacing: 0.3px;
+    }
+
+    .status-bar .time {
+      font-weight: 600;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-bar .time::before {
+      content: "🌲";
+      font-size: 14px;
+    }
+
+    /* поисковая секция */
+    .search-section {
+      padding: clamp(4px, 1vw, 8px) clamp(12px, 3vw, 20px) clamp(8px, 2vw, 14px);
+      display: flex;
+      gap: clamp(8px, 2vw, 14px);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex: 1 1 200px;
+      display: flex;
+      align-items: center;
+      background: var(--surface-card);
+      border-radius: 40px;
+      padding: 0 clamp(12px, 2.5vw, 20px);
+      height: clamp(44px, 7vw, 54px);
+      gap: 10px;
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .search-icon {
+      color: var(--accent);
+      font-size: clamp(16px, 3vw, 20px);
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+
+    .search-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: clamp(14px, 2.5vw, 17px);
+      font-weight: 400;
+      padding: 10px 0;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .search-box input::placeholder {
+      color: #6b8063;
+      font-weight: 400;
+      opacity: 0.7;
+    }
+
+    .profile-btn {
+      width: clamp(40px, 8vw, 50px);
+      height: clamp(40px, 8vw, 50px);
+      background: var(--surface-card);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: clamp(18px, 4vw, 24px);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: 0.2s;
+      opacity: 0.8;
+    }
+
+    .profile-btn:hover {
+      background: var(--sage-800);
+      opacity: 1;
+    }
+
+    /* карта */
+    #map {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 280px;
+      background: #1e2a1b;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* нижняя панель маршрута */
+    .route-panel {
+      background: var(--surface);
+      padding: clamp(12px, 2.5vw, 18px) clamp(14px, 3vw, 20px) clamp(16px, 3vw, 22px);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(8px, 1.5vw, 12px);
+    }
+
+    .address-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface-card);
+      border-radius: 20px;
+      padding: clamp(6px, 1.5vw, 10px) clamp(12px, 2.5vw, 18px);
+      border: 1px solid var(--border);
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(125, 155, 116, 0.4);
+      flex-shrink: 0;
+    }
+
+    .dot.destination {
+      background: var(--warning);
+      box-shadow: 0 0 10px rgba(212, 163, 115, 0.4);
+    }
+
+    .address-text {
+      flex: 1;
+      color: var(--text-primary);
+      font-size: clamp(13px, 2.2vw, 16px);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.2px;
+    }
+
+    .swap-btn {
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      font-size: clamp(18px, 4vw, 24px);
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.25s;
+      align-self: flex-end;
+      margin-right: 6px;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      opacity: 0.7;
+    }
+
+    .swap-btn:hover {
+      color: var(--text-primary);
+      background: rgba(125, 155, 116, 0.1);
+      transform: rotate(180deg);
+      opacity: 1;
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .start-route-btn {
+      background: var(--sage-600);
+      border: none;
+      border-radius: 40px;
+      padding: clamp(10px, 2.5vw, 16px) clamp(20px, 4vw, 32px);
+      color: var(--sage-50);
+      font-weight: 700;
+      font-size: clamp(14px, 2.5vw, 17px);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(74, 99, 66, 0.3);
+      transition: 0.2s;
+      border: 1px solid var(--sage-500);
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+    }
+
+    .start-route-btn:hover {
+      background: var(--sage-500);
+      box-shadow: 0 8px 24px rgba(74, 99, 66, 0.45);
+      transform: scale(1.02);
+    }
+
+    .route-stats {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      font-size: clamp(12px, 2vw, 14px);
+      font-weight: 500;
+      flex-wrap: wrap;
+    }
+
+    .route-stats span {
+      background: var(--surface-card);
+      padding: 6px 14px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    /* маркер лагеря на карте — дополнительный стиль для popup */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+    .leaflet-popup-tip {
+      background: var(--surface-card);
+    }
+
+    @media (max-width: 380px) {
+      .search-box {
+        height: 42px;
+      }
+      .address-row {
+        padding: 6px 10px;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .app-wrapper {
+        max-width: 520px;
+        border-radius: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- статус бар -->
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span>📶 🔋 91%</span>
+    </div>
+
+    <!-- поиск -->
+    <div class="search-section">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="Куда направляемся?" id="destinationInput" value="ДОЛ «Серебряные ели»">
+      </div>
+      <div class="profile-btn">👤</div>
+    </div>
+
+    <!-- карта -->
+    <div id="map"></div>
+
+    <!-- панель маршрута -->
+    <div class="route-panel">
+      <div class="address-row">
+        <div class="dot"></div>
+        <div class="address-text" id="startAddress">Моховая аллея, 3</div>
+      </div>
+      <button class="swap-btn" id="swapBtn" title="Поменять местами">↕️</button>
+      <div class="address-row">
+        <div class="dot destination"></div>
+        <div class="address-text" id="destAddress">ДОЛ «Серебряные ели»</div>
+      </div>
+
+      <div class="action-row">
+        <button class="start-route-btn" id="buildRouteBtn">
+          <span>🚗</span> Проложить путь
+        </button>
+        <div class="route-stats">
+          <span>⏱️ 14 мин</span>
+          <span>📏 4.1 км</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Routing Machine -->
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+  <script>
+    (function() {
+      // Координаты выдуманного города (примерно парк Лосиный Остров / восток Москвы)
+      const map = L.map('map', {
+        center: [55.8350, 37.7600],
+        zoom: 14,
+        zoomControl: false,
+        attributionControl: false
+      });
+
+      // Приглушённый, естественный тайл (светлый, без ярких красок)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 19,
+      }).addTo(map);
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      // Выдуманные места, включая детский лагерь
+      const fictionalPlaces = {
+        'Моховая аллея, 3': [55.8210, 37.7420],
+        'Изумрудный бульвар, 15': [55.8280, 37.7550],
+        'Площадь Тыквенных Фонарей': [55.8180, 37.7680],
+        'Улица Лунного Света, 7': [55.8400, 37.7350],
+        'Переулок Зелёных Яблок': [55.8100, 37.7700],
+        'Проспект Лесных Эльфов, 22': [55.8450, 37.7800],
+        'Туманная набережная, 5': [55.8320, 37.7200],
+        'Серебряный тупик': [55.8050, 37.7580],
+        'ДОЛ «Серебряные ели»': [55.8420, 37.7750],  // детский оздоровительный лагерь
+        'Кедровая роща': [55.8285, 37.7820],
+        'Озёрная станция': [55.8520, 37.7600],
+      };
+
+      let routingControl = null;
+      let startMarker = null;
+      let destMarker = null;
+
+      // По умолчанию: от Моховой аллеи до лагеря
+      let currentStartCoords = [...fictionalPlaces['Моховая аллея, 3']];
+      let currentDestCoords = [...fictionalPlaces['ДОЛ «Серебряные ели»']];
+
+      const startAddressEl = document.getElementById('startAddress');
+      const destAddressEl = document.getElementById('destAddress');
+      const destinationInput = document.getElementById('destinationInput');
+      const buildRouteBtn = document.getElementById('buildRouteBtn');
+      const swapBtn = document.getElementById('swapBtn');
+
+      function createIcon(color, shadowColor) {
+        return L.divIcon({
+          className: 'custom-marker',
+          html: `<div style="background: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid #e3ebe0; box-shadow: 0 3px 12px ${shadowColor};"></div>`,
+          iconSize: [22, 22],
+          iconAnchor: [11, 11]
+        });
+      }
+
+      function updateMarkers(startCoords, destCoords) {
+        if (startMarker) map.removeLayer(startMarker);
+        if (destMarker) map.removeLayer(destMarker);
+
+        startMarker = L.marker(startCoords, {
+          icon: createIcon('#7d9b74', 'rgba(125,155,116,0.5)'),
+          draggable: true
+        }).addTo(map).bindPopup('🌲 Старт').openPopup();
+
+        destMarker = L.marker(destCoords, {
+          icon: createIcon('#d4a373', 'rgba(212,163,115,0.5)'),
+          draggable: true
+        }).addTo(map).bindPopup('🏕️ Лагерь «Серебряные ели»').openPopup();
+
+        startMarker.on('dragend', function(e) {
+          const pos = e.target.getLatLng();
+          currentStartCoords = [pos.lat, pos.lng];
+          updateAddressFromCoords(pos.lat, pos.lng, 'start');
+        });
+
+        destMarker.on('dragend', function(e) {
+          const pos = e.target.getLatLng();
+          currentDestCoords = [pos.lat, pos.lng];
+          updateAddressFromCoords(pos.lat, pos.lng, 'dest');
+        });
+      }
+
+      function updateAddressFromCoords(lat, lng, type) {
+        let closestName = null;
+        let minDist = Infinity;
+        for (const [name, coords] of Object.entries(fictionalPlaces)) {
+          const d = Math.sqrt(Math.pow(coords[0] - lat, 2) + Math.pow(coords[1] - lng, 2));
+          if (d < minDist) {
+            minDist = d;
+            closestName = name;
+          }
+        }
+        if (minDist < 0.01 && closestName) {
+          if (type === 'start') {
+            startAddressEl.textContent = closestName;
+          } else {
+            destAddressEl.textContent = closestName;
+            destinationInput.value = closestName;
+          }
+        } else {
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=ru`)
+            .then(r => r.json())
+            .then(data => {
+              if (data && data.display_name) {
+                const short = data.display_name.split(',')[0];
+                const display = short ? `📍 ${short}` : 'Неизвестная улица';
+                if (type === 'start') startAddressEl.textContent = display;
+                else {
+                  destAddressEl.textContent = display;
+                  destinationInput.value = display;
+                }
+              }
+            }).catch(() => {});
+        }
+      }
+
+      function geocodeAddress(query, callback) {
+        const trimmed = query.trim();
+        // точное совпадение с выдуманными
+        const foundKey = Object.keys(fictionalPlaces).find(
+          key => key.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (foundKey) {
+          callback(fictionalPlaces[foundKey]);
+          return;
+        }
+        // частичное совпадение
+        for (const [name, coords] of Object.entries(fictionalPlaces)) {
+          if (name.toLowerCase().includes(trimmed.toLowerCase())) {
+            callback(coords);
+            return;
+          }
+        }
+        // fallback: Nominatim
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed)}&limit=1&accept-language=ru`)
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.length > 0) {
+              callback([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+            } else {
+              alert('🌲 Адрес не найден. Попробуйте: ДОЛ «Серебряные ели»');
+            }
+          }).catch(() => alert('Ошибка поиска.'));
+      }
+
+      function buildRoute(startCoords, destCoords) {
+        if (routingControl) {
+          map.removeControl(routingControl);
+        }
+        routingControl = L.Routing.control({
+          waypoints: [
+            L.latLng(startCoords[0], startCoords[1]),
+            L.latLng(destCoords[0], destCoords[1])
+          ],
+          routeWhileDragging: false,
+          showAlternatives: false,
+          lineOptions: {
+            styles: [{ color: '#5f7d55', weight: 6, opacity: 0.85 }]
+          },
+          createMarker: function() { return null; },
+          router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1'
+          }),
+          show: false,
+        }).addTo(map);
+
+        routingControl.on('routesfound', function(e) {
+          const route = e.routes[0];
+          if (route) {
+            const distKm = (route.summary.totalDistance / 1000).toFixed(1);
+            const timeMin = Math.round(route.summary.totalTime / 60);
+            const statsSpans = document.querySelectorAll('.route-stats span');
+            if (statsSpans.length >= 2) {
+              statsSpans[0].innerHTML = `⏱️ ${timeMin} мин`;
+              statsSpans[1].innerHTML = `📏 ${distKm} км`;
+            }
+          }
+        });
+
+        const group = L.featureGroup([startMarker, destMarker]);
+        map.fitBounds(group.getBounds().pad(0.25));
+      }
+
+      function applyDestinationFromInput() {
+        const query = destinationInput.value.trim();
+        if (query === '') return;
+        destAddressEl.textContent = query;
+        geocodeAddress(query, (coords) => {
+          currentDestCoords = coords;
+          updateMarkers(currentStartCoords, currentDestCoords);
+          buildRoute(currentStartCoords, currentDestCoords);
+        });
+      }
+
+      // Инициализация
+      updateMarkers(currentStartCoords, currentDestCoords);
+      buildRoute(currentStartCoords, currentDestCoords);
+
+      buildRouteBtn.addEventListener('click', () => {
+        applyDestinationFromInput();
+      });
+
+      destinationInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          applyDestinationFromInput();
+        }
+      });
+
+      swapBtn.addEventListener('click', () => {
+        [currentStartCoords, currentDestCoords] = [currentDestCoords, currentStartCoords];
+        const startText = startAddressEl.textContent;
+        const destText = destAddressEl.textContent;
+        startAddressEl.textContent = destText;
+        destAddressEl.textContent = startText;
+        destinationInput.value = startText;
+        updateMarkers(currentStartCoords, currentDestCoords);
+        buildRoute(currentStartCoords, currentDestCoords);
+      });
+
+      // Геолокация
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            currentStartCoords = [pos.coords.latitude, pos.coords.longitude];
+            updateAddressFromCoords(pos.coords.latitude, pos.coords.longitude, 'start');
+            updateMarkers(currentStartCoords, currentDestCoords);
+            buildRoute(currentStartCoords, currentDestCoords);
+          },
+          () => console.log('Геолокация отключена.')
+        );
+      }
+    })();
+  </script>
+</body>
+</html>
